@@ -5,23 +5,22 @@ const { Server } = require('socket.io');
 /**
  * socketService
  * ─────────────
- * Service singleton qui gère :
- *   - l'initialisation de Socket.io
- *   - les connexions/déconnexions clients
- *   - la diffusion d'événements
- *   - le stockage en mémoire du dernier état par clé
+ * Utilise les rooms Socket.io pour cibler les mises à jour par userId.
+ *
+ * Flux :
+ *   1. Le navigateur se connecte et rejoint sa room : socket.join(`user:${userId}`)
+ *   2. Laravel envoie POST /broadcast/ventilateur avec { userId, ... }
+ *   3. Node.js diffuse uniquement dans la room `user:{userId}`
+ *
+ * Chaque éleveur ne reçoit QUE ses propres données.
  */
 
 let io = null;
 
-// Stockage en mémoire : dernière valeur reçue par type + clé
-// Structure : { 'ventilateur:98f2127d': payload, 'capteur:abc123': payload }
+// Stockage en mémoire : dernière valeur par userId + type
+// Structure : { 'user:52:ventilateur:98f2127d': payload }
 const latestStates = new Map();
 
-/**
- * Initialise Socket.io sur le serveur HTTP.
- * À appeler une seule fois au démarrage.
- */
 function init(server, allowedOrigin) {
     io = new Server(server, {
         cors: {
@@ -32,52 +31,64 @@ function init(server, allowedOrigin) {
     });
 
     io.on('connection', (socket) => {
-        console.log(`[WS] Client connecté    : ${socket.id} (total: ${io.engine.clientsCount})`);
+        console.log(`[WS] Client connecté : ${socket.id}`);
 
-        // Envoyer l'état courant de tous les équipements au nouveau client
-        latestStates.forEach((payload, key) => {
-            socket.emit(payload.event, payload);
+        // ── Le client envoie son userId pour rejoindre sa room ────────────────
+        // fan.js envoie : socket.emit('join', { userId })
+        socket.on('join', ({ userId }) => {
+            if (!userId) return;
+
+            const room = `user:${userId}`;
+            socket.join(room);
+            console.log(`[WS] ${socket.id} a rejoint la room ${room}`);
+
+            // Envoyer l'état courant uniquement pour cet utilisateur
+            latestStates.forEach((payload, key) => {
+                if (key.startsWith(`user:${userId}:`)) {
+                    socket.emit(payload.event, payload);
+                }
+            });
         });
 
         socket.on('disconnect', (reason) => {
-            console.log(`[WS] Client déconnecté  : ${socket.id} — ${reason}`);
+            console.log(`[WS] Client déconnecté : ${socket.id} — ${reason}`);
         });
     });
 
-    console.log('[WS] Socket.io initialisé');
+    console.log('[WS] Socket.io initialisé (rooms par userId)');
     return io;
 }
 
 /**
- * Diffuse un événement à tous les clients connectés.
- * Mémorise aussi le dernier état pour les nouveaux clients.
+ * Diffuse un événement uniquement dans la room de l'utilisateur.
  *
- * @param {string} event     Nom de l'événement Socket.io
- * @param {string} stateKey  Clé unique pour mémoriser l'état (ex: 'ventilateur:98f2127d')
- * @param {object} payload   Données à diffuser
+ * @param {string} event    Nom de l'événement Socket.io
+ * @param {string} stateKey Clé unique (ex: 'user:52:ventilateur:98f2127d')
+ * @param {object} payload  Données à diffuser — doit contenir { userId }
  */
 function broadcast(event, stateKey, payload) {
-    if (!io) throw new Error('socketService non initialisé — appelez init() d\'abord.');
+    if (!io) throw new Error('socketService non initialisé.');
+
+    const userId = payload.userId;
+    if (!userId) {
+        console.warn('[WS] broadcast sans userId — ignoré');
+        return;
+    }
 
     // Mémoriser le dernier état
     latestStates.set(stateKey, { event, ...payload });
 
-    // Diffuser à tous les clients
-    io.emit(event, payload);
+    // Diffuser UNIQUEMENT dans la room de cet utilisateur
+    const room = `user:${userId}`;
+    io.to(room).emit(event, payload);
 
-    console.log(`[WS] Broadcast : ${event} | key=${stateKey} | clients=${io.engine.clientsCount}`);
+    console.log(`[WS] Broadcast : ${event} | room=${room} | key=${stateKey}`);
 }
 
-/**
- * Retourne le nombre de clients connectés.
- */
 function clientsCount() {
     return io ? io.engine.clientsCount : 0;
 }
 
-/**
- * Retourne tous les états mémorisés (pour debug).
- */
 function getAllStates() {
     return Object.fromEntries(latestStates);
 }
