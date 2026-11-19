@@ -51,11 +51,11 @@ socket.on('join', ({ userId }) => { socket.join(`user:${userId}`); ... })
   - JWT HS256 ou HMAC maison : `{ userId, exp: now + 1h }`, signé avec un secret partagé `WS_JWT_SECRET` ;
   - rendre le jeton disponible en JS : `window.wsToken`.
 - [ ] **[Laravel]** `fan.js` et `brumisateur.js` : envoyer le jeton à la connexion avec `io(wsUrl, { auth: { token: window.wsToken }, … })`, et **ne plus envoyer `userId`** dans `join`.
-- [ ] Websocket : un middleware `io.use((socket, next) => …)` vérifie la signature et l'expiration du jeton :
+- [x] Websocket : un middleware `io.use((socket, next) => …)` vérifie la signature et l'expiration du jeton :
   - refuser la connexion si le jeton est invalide ;
   - sinon `socket.data.userId = payload.userId` et `socket.join('user:' + userId)` automatiquement.
-- [ ] Supprimer l'événement `join` côté serveur, ou ignorer le `userId` envoyé par le client.
-- [ ] Ajouter `WS_JWT_SECRET` dans le `.env` du websocket **et** de Laravel (prod et local : `docker-compose.yml`).
+- [x] Supprimer l'événement `join` côté serveur, ou ignorer le `userId` envoyé par le client. *Fait : `join` ignoré si le socket est authentifié ou si `WS_AUTH_REQUIRED=true` ; accepté avec avertissement sinon (rétrocompatibilité).*
+- [ ] Ajouter `WS_JWT_SECRET` dans le `.env` du websocket **et** de Laravel (prod et local : `docker-compose.yml`). *Local fait (`.env` + `docker-compose.yml`) ; reste la prod.*
 - [ ] Prévoir la reconnexion après expiration du jeton (rechargement de la page, ou route Laravel `/ws/token` pour en demander un nouveau).
 
 ---

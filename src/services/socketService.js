@@ -2,6 +2,7 @@
 
 const { Server } = require('socket.io');
 const config     = require('../config');
+const { socketAuth } = require('../middlewares/socketAuth');
 
 /**
  * socketService
@@ -9,7 +10,11 @@ const config     = require('../config');
  * Utilise les rooms Socket.io pour cibler les mises à jour par userId.
  *
  * Flux :
- *   1. Le navigateur se connecte et rejoint sa room : socket.join(`user:${userId}`)
+ *   1. Le navigateur se connecte avec un jeton signé par Laravel :
+ *      io(wsUrl, { auth: { token } }). Le middleware socketAuth vérifie le
+ *      jeton et le serveur place le socket dans la room `user:{userId}`.
+ *      (Mode rétrocompatible WS_AUTH_REQUIRED=false : l'ancien
+ *      socket.emit('join', { userId }) est encore accepté, avec avertissement.)
  *   2. Laravel envoie POST /broadcast/ventilateur avec { userId, ... }
  *   3. Node.js diffuse uniquement dans la room `user:{userId}`
  *
@@ -47,24 +52,30 @@ function init(server, corsOrigin) {
         allowRequest,
     });
 
+    io.use(socketAuth);
+
     io.on('connection', (socket) => {
         console.log(`[WS] Client connecté : ${socket.id}`);
 
-        // ── Le client envoie son userId pour rejoindre sa room ────────────────
-        // fan.js envoie : socket.emit('join', { userId })
-        socket.on('join', ({ userId }) => {
+        // ── Jeton valide : room de l'utilisateur authentifié ──────────────────
+        if (socket.data.userId) {
+            joinUserRoom(socket, socket.data.userId);
+        }
+
+        // ── Ancien protocole : le client envoie lui-même son userId ───────────
+        socket.on('join', (data) => {
+            if (socket.data.userId) return; // déjà authentifié : userId client ignoré
+
+            if (config.authRequired()) {
+                console.warn(`[WS] ${socket.id} : 'join' ignoré (WS_AUTH_REQUIRED=true)`);
+                return;
+            }
+
+            const userId = data && data.userId;
             if (!userId) return;
 
-            const room = `user:${userId}`;
-            socket.join(room);
-            console.log(`[WS] ${socket.id} a rejoint la room ${room}`);
-
-            // Envoyer l'état courant uniquement pour cet utilisateur
-            latestStates.forEach((payload, key) => {
-                if (key.startsWith(`user:${userId}:`)) {
-                    socket.emit(payload.event, payload);
-                }
-            });
+            console.warn(`[WS] ${socket.id} : 'join' non authentifié pour user:${userId} (WS_AUTH_REQUIRED=false)`);
+            joinUserRoom(socket, userId);
         });
 
         socket.on('disconnect', (reason) => {
@@ -74,6 +85,22 @@ function init(server, corsOrigin) {
 
     console.log('[WS] Socket.io initialisé (rooms par userId)');
     return io;
+}
+
+/**
+ * Place le socket dans la room de l'utilisateur et lui renvoie les derniers
+ * états connus de cet utilisateur uniquement.
+ */
+function joinUserRoom(socket, userId) {
+    const room = `user:${userId}`;
+    socket.join(room);
+    console.log(`[WS] ${socket.id} a rejoint la room ${room}`);
+
+    latestStates.forEach((payload, key) => {
+        if (key.startsWith(`${room}:`)) {
+            socket.emit(payload.event, payload);
+        }
+    });
 }
 
 /**

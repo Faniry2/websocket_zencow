@@ -13,6 +13,10 @@ function broadcastSecret() {
     return process.env.WS_BROADCAST_SECRET || '';
 }
 
+function jwtSecret() {
+    return process.env.WS_JWT_SECRET || '';
+}
+
 function isProduction() {
     return process.env.NODE_ENV === 'production';
 }
@@ -37,4 +41,4 @@ function corsOrigins() {
     return origins.length > 0 ? origins : [DEFAULT_ORIGIN];
 }
 
-module.exports = { authRequired, broadcastSecret, isProduction, allowedOrigins, corsOrigins };
+module.exports = { authRequired, broadcastSecret, jwtSecret, isProduction, allowedOrigins, corsOrigins };
