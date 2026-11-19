@@ -108,8 +108,8 @@ Constat (`capteurController.js`) :
 ## 6. 🟠 Adresse d'écoute (`HOST`)
 
 - [x] `websocket-server.js` : l'adresse d'écoute se règle avec `process.env.HOST` (défaut `127.0.0.1`, donc aucun changement en prod). Docker la définit à `0.0.0.0`. *Modification faite, pas encore commitée.*
-- [ ] Optionnel : renommer en `WS_HOST`. Aucun système ne définit cette variable, alors que zsh et tcsh définissent `HOST` avec le nom de la machine. Ça change une ligne ici et une dans `docker-compose.yml`.
-- [ ] Ajouter un `.env.example` au dépôt, avec `PORT`, `HOST`, `ALLOWED_ORIGIN`, `NODE_ENV`, `WS_JWT_SECRET` et `WS_BROADCAST_SECRET`.
+- [ ] Optionnel : renommer en `WS_HOST`. *Non fait : décision de garder `HOST`.* Aucun système ne définit cette variable, alors que zsh et tcsh définissent `HOST` avec le nom de la machine. Ça change une ligne ici et une dans `docker-compose.yml`.
+- [x] Ajouter un `.env.example` au dépôt, avec `PORT`, `HOST`, `ALLOWED_ORIGIN`, `NODE_ENV`, `WS_JWT_SECRET` et `WS_BROADCAST_SECRET`.
 
 ---
 
