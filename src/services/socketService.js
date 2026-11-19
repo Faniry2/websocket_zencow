@@ -2,7 +2,9 @@
 
 const { Server } = require('socket.io');
 const config     = require('../config');
-const { socketAuth } = require('../middlewares/socketAuth');
+const logger     = require('../logger');
+const { socketAuth }        = require('../middlewares/socketAuth');
+const { connectionLimiter } = require('../middlewares/rateLimit');
 
 /**
  * socketService
@@ -24,22 +26,45 @@ const { socketAuth } = require('../middlewares/socketAuth');
 let io = null;
 
 // Stockage en mémoire : dernière valeur par userId + type
-// Structure : { 'user:52:ventilateur:98f2127d': payload }
+// Structure : { 'user:52:ventilateur:98f2127d': { payload, at } }
+// Les états plus vieux que STATE_TTL_HOURS (défaut 24 h) sont supprimés.
 const latestStates = new Map();
+let purgeTimer = null;
+
+function stateTtlMs() {
+    const h = Number.parseFloat(process.env.STATE_TTL_HOURS);
+    return (Number.isFinite(h) && h > 0 ? h : 24) * 3600 * 1000;
+}
+
+function purgeExpiredStates(now = Date.now()) {
+    const ttl = stateTtlMs();
+    let removed = 0;
+    latestStates.forEach((entry, key) => {
+        if (now - entry.at > ttl) { latestStates.delete(key); removed += 1; }
+    });
+    if (removed > 0) logger.debug(`[WS] ${removed} état(s) expiré(s) supprimé(s)`);
+    return removed;
+}
 
 /**
  * Vérifie l'origine de chaque poignée de main, y compris en transport
  * websocket (l'option `cors` ne s'applique qu'au polling).
  * Appliqué uniquement si ALLOWED_ORIGIN est défini.
+ * Applique aussi la limite de connexions par IP (RATE_LIMIT_CONNECTIONS).
  */
 function allowRequest(req, cb) {
+    if (!connectionLimiter.hit(req)) return cb('Trop de connexions', false);
+
     const origins = config.allowedOrigins();
     if (origins.length === 0) return cb(null, true);
 
     const origin = req.headers.origin;
     const ok = origins.includes(origin);
-    if (!ok) console.warn(`[WS] Origine refusée : ${origin || '(absente)'}`);
-    cb(null, ok);
+    if (!ok) {
+        logger.warn(`[WS] Origine refusée : ${origin || '(absente)'}`);
+        return cb(null, false);
+    }
+    cb(null, true);
 }
 
 function init(server, corsOrigin) {
@@ -54,8 +79,11 @@ function init(server, corsOrigin) {
 
     io.use(socketAuth);
 
+    purgeTimer = setInterval(purgeExpiredStates, 10 * 60 * 1000);
+    purgeTimer.unref();
+
     io.on('connection', (socket) => {
-        console.log(`[WS] Client connecté : ${socket.id}`);
+        logger.debug(`[WS] Client connecté : ${socket.id}`);
 
         // ── Jeton valide : room de l'utilisateur authentifié ──────────────────
         if (socket.data.userId) {
@@ -67,23 +95,23 @@ function init(server, corsOrigin) {
             if (socket.data.userId) return; // déjà authentifié : userId client ignoré
 
             if (config.authRequired()) {
-                console.warn(`[WS] ${socket.id} : 'join' ignoré (WS_AUTH_REQUIRED=true)`);
+                logger.warn(`[WS] ${socket.id} : 'join' ignoré (WS_AUTH_REQUIRED=true)`);
                 return;
             }
 
             const userId = data && data.userId;
             if (!userId) return;
 
-            console.warn(`[WS] ${socket.id} : 'join' non authentifié pour user:${userId} (WS_AUTH_REQUIRED=false)`);
+            logger.warnThrottled('legacy-join', `[WS] 'join' non authentifié accepté (user:${userId}, WS_AUTH_REQUIRED=false)`);
             joinUserRoom(socket, userId);
         });
 
         socket.on('disconnect', (reason) => {
-            console.log(`[WS] Client déconnecté : ${socket.id} — ${reason}`);
+            logger.debug(`[WS] Client déconnecté : ${socket.id} — ${reason}`);
         });
     });
 
-    console.log('[WS] Socket.io initialisé (rooms par userId)');
+    logger.info('[WS] Socket.io initialisé (rooms par userId)');
     return io;
 }
 
@@ -94,11 +122,13 @@ function init(server, corsOrigin) {
 function joinUserRoom(socket, userId) {
     const room = `user:${userId}`;
     socket.join(room);
-    console.log(`[WS] ${socket.id} a rejoint la room ${room}`);
+    logger.debug(`[WS] ${socket.id} a rejoint la room ${room}`);
 
-    latestStates.forEach((payload, key) => {
-        if (key.startsWith(`${room}:`)) {
-            socket.emit(payload.event, payload);
+    const ttl = stateTtlMs();
+    const now = Date.now();
+    latestStates.forEach((entry, key) => {
+        if (key.startsWith(`${room}:`) && now - entry.at <= ttl) {
+            socket.emit(entry.event, entry.payload);
         }
     });
 }
@@ -115,18 +145,18 @@ function broadcast(event, stateKey, payload) {
 
     const userId = payload.userId;
     if (!userId) {
-        console.warn('[WS] broadcast sans userId — ignoré');
+        logger.warn('[WS] broadcast sans userId — ignoré');
         return;
     }
 
     // Mémoriser le dernier état
-    latestStates.set(stateKey, { event, ...payload });
+    latestStates.set(stateKey, { event, payload, at: Date.now() });
 
     // Diffuser UNIQUEMENT dans la room de cet utilisateur
     const room = `user:${userId}`;
     io.to(room).emit(event, payload);
 
-    console.log(`[WS] Broadcast : ${event} | room=${room} | key=${stateKey}`);
+    logger.info(`[WS] Broadcast : ${event} | room=${room} | key=${stateKey}`);
 }
 
 function clientsCount() {
@@ -134,7 +164,26 @@ function clientsCount() {
 }
 
 function getAllStates() {
-    return Object.fromEntries(latestStates);
+    const out = {};
+    latestStates.forEach((entry, key) => {
+        out[key] = { event: entry.event, ...entry.payload, storedAt: new Date(entry.at).toISOString() };
+    });
+    return out;
 }
 
-module.exports = { init, broadcast, clientsCount, getAllStates };
+function clearStates() {
+    latestStates.clear();
+}
+
+/** Ferme socket.io (et le serveur HTTP qui le porte). */
+function close() {
+    return new Promise((resolve) => {
+        if (purgeTimer) clearInterval(purgeTimer);
+        if (!io) return resolve();
+        io.close(() => resolve());
+    });
+}
+
+module.exports = {
+    init, broadcast, clientsCount, getAllStates, clearStates, purgeExpiredStates, close,
+};

@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const config = require('../config');
+const logger = require('../logger');
 
 const HEADER = 'x-ws-secret';
 
@@ -40,16 +41,16 @@ function requireSecret(req, res, next) {
 
     if (provided !== undefined) {
         if (hasValidSecret(req)) return next();
-        console.warn(`[AUTH] ${req.method} ${req.originalUrl} : X-WS-Secret invalide (${req.ip})`);
+        logger.warn(`[AUTH] ${req.method} ${req.originalUrl} : X-WS-Secret invalide (${req.ip})`);
         return unauthorized(res);
     }
 
     if (config.authRequired()) {
-        console.warn(`[AUTH] ${req.method} ${req.originalUrl} : X-WS-Secret absent (${req.ip})`);
+        logger.warn(`[AUTH] ${req.method} ${req.originalUrl} : X-WS-Secret absent (${req.ip})`);
         return unauthorized(res);
     }
 
-    console.warn(`[AUTH] ${req.method} ${req.originalUrl} sans X-WS-Secret accepté (WS_AUTH_REQUIRED=false)`);
+    logger.warnThrottled(`legacy-secret:${req.path}`, `[AUTH] ${req.method} ${req.originalUrl} sans X-WS-Secret accepté (WS_AUTH_REQUIRED=false)`);
     return next();
 }
 

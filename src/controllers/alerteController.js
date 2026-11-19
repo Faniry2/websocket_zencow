@@ -1,6 +1,7 @@
 'use strict';
 
-const socketService = require('../services/socketService');
+const socketService          = require('../services/socketService');
+const { validate, schemas }   = require('../validation');
 
 /**
  * POST /broadcast/alerte
@@ -21,30 +22,14 @@ const socketService = require('../services/socketService');
  * }
  */
 function broadcast(req, res) {
-    const payload = req.body;
+    const result = validate(schemas.alerte, req.body, 'alerte');
+    if (result.status) return res.status(result.status).json(result.body);
 
-    // ── Validation ─────────────────────────────────────────────────────────
-    const required = ['event', 'userId', 'ith', 'niveau'];
-    const missing  = required.filter((k) => payload[k] === undefined);
-
-    if (missing.length > 0) {
-        return res.status(422).json({
-            error:   'Champs manquants dans le payload alerte.',
-            missing,
-        });
-    }
-
-    const niveauxValides = ['attention', 'alerte', 'critique'];
-    if (!niveauxValides.includes(payload.niveau)) {
-        return res.status(422).json({
-            error: `niveau doit être : ${niveauxValides.join(', ')}.`,
-        });
-    }
+    const payload = result.value;
 
     // ── Clé unique par user + capteur (préfixe `user:` : renvoyée à la connexion)
     const stateKey = `user:${payload.userId}:alerte:${payload.capteurId ?? 'global'}`;
 
-    // ── Diffuser via Socket.io ─────────────────────────────────────────────
     socketService.broadcast('alerte.ith', stateKey, payload);
 
     res.json({

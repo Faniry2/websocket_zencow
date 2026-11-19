@@ -1,6 +1,7 @@
 'use strict';
 
-const socketService = require('../services/socketService');
+const socketService          = require('../services/socketService');
+const { validate, schemas }   = require('../validation');
 
 /**
  * POST /broadcast/capteur
@@ -22,23 +23,14 @@ const socketService = require('../services/socketService');
  * }
  */
 function broadcast(req, res) {
-    const payload = req.body;
+    const result = validate(schemas.capteur, req.body, 'capteur');
+    if (result.status) return res.status(result.status).json(result.body);
 
-    // ── Validation ─────────────────────────────────────────────────────────
-    const required = ['event', 'userId', 'capteurId', 'ith'];
-    const missing  = required.filter((k) => payload[k] === undefined);
-
-    if (missing.length > 0) {
-        return res.status(422).json({
-            error:   'Champs manquants dans le payload capteur.',
-            missing,
-        });
-    }
+    const payload = result.value;
 
     // ── Clé unique par user + capteur (préfixe `user:` : renvoyée à la connexion)
     const stateKey = `user:${payload.userId}:capteur:${payload.capteurId}`;
 
-    // ── Diffuser via Socket.io ─────────────────────────────────────────────
     socketService.broadcast('capteur.mesure', stateKey, payload);
 
     res.json({

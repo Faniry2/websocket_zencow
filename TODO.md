@@ -115,12 +115,12 @@ Constat (`capteurController.js`) :
 
 ## 7. 🟢 Robustesse
 
-- [ ] `latestStates` (une `Map` en mémoire) : perdue à chaque redémarrage, et elle grossit sans limite (une entrée par appareil). Ajouter une durée de vie, par exemple supprimer les états de plus de 24 h.
-- [ ] Contrôler le contenu reçu : types et bornes de chaque champ, et refus des champs inattendus, au lieu de rediffuser `req.body` tel quel aux navigateurs.
-- [ ] Limite de taille du corps des requêtes : `express.json({ limit: '10kb' })`.
-- [ ] Limite de débit par IP sur `/broadcast/*` et sur les connexions socket.io.
-- [ ] Logs : moins verbeux en prod (une ligne par message diffusé), avec un niveau réglable par `LOG_LEVEL`.
-- [ ] Arrêt propre sur `SIGTERM` (`io.close()`, `server.close()`), pour PM2 et Docker.
+- [x] `latestStates` (une `Map` en mémoire) : perdue à chaque redémarrage, et elle grossit sans limite (une entrée par appareil). Ajouter une durée de vie, par exemple supprimer les états de plus de 24 h. *Fait : `STATE_TTL_HOURS` (défaut 24), purge toutes les 10 min ; toujours perdue au redémarrage.*
+- [x] Contrôler le contenu reçu : types et bornes de chaque champ, et refus des champs inattendus, au lieu de rediffuser `req.body` tel quel aux navigateurs.
+- [x] Limite de taille du corps des requêtes : `express.json({ limit: '10kb' })`.
+- [x] Limite de débit par IP sur `/broadcast/*` et sur les connexions socket.io. *Fait : `RATE_LIMIT_BROADCAST` / `RATE_LIMIT_CONNECTIONS`, boucle locale exemptée, `TRUST_PROXY` derrière un proxy.*
+- [x] Logs : moins verbeux en prod (une ligne par message diffusé), avec un niveau réglable par `LOG_LEVEL`.
+- [x] Arrêt propre sur `SIGTERM` (`io.close()`, `server.close()`), pour PM2 et Docker.
 
 ---
 

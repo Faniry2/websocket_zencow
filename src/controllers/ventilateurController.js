@@ -1,6 +1,7 @@
 'use strict';
 
-const socketService = require('../services/socketService');
+const socketService          = require('../services/socketService');
+const { validate, schemas }   = require('../validation');
 
 /**
  * POST /broadcast/ventilateur
@@ -18,28 +19,23 @@ const socketService = require('../services/socketService');
  *   "receivedAt":    "2026-04-22T13:19:51.545+00:00",
  *   "configId":      4
  * }
+ *
+ * Tout champ non listé ci-dessus est refusé (422).
  */
 function broadcast(req, res) {
-    const payload = req.body;
+    const result = validate(schemas.ventilateur, req.body, 'ventilateur');
+    if (result.status) return res.status(result.status).json(result.body);
 
-    const required = ['event', 'userId', 'devEui', 'refActionneur', 'vitesse', 'mode'];
-    const missing  = required.filter((k) => payload[k] === undefined);
-
-    if (missing.length > 0) {
-        return res.status(422).json({
-            error:   'Champs manquants dans le payload ventilateur.',
-            missing,
-        });
+    const payload = result.value;
+    const ref     = payload.refActionneur ?? payload.devEui;
+    if (ref === null || ref === undefined) {
+        return res.status(422).json({ error: 'refActionneur ou devEui doit être renseigné.' });
     }
 
-    if (payload.vitesse < 0 || payload.vitesse > 100) {
-        return res.status(422).json({ error: 'vitesse doit etre entre 0 et 100.' });
-    }
+    // Clé unique incluant userId pour isoler par utilisateur
+    const stateKey = `user:${payload.userId}:ventilateur:${ref}`;
 
-    // Cle unique incluant userId pour isoler par utilisateur
-    const stateKey = `user:${payload.userId}:ventilateur:${payload.refActionneur}`;
-
-    // Diffuser uniquement dans la room de l utilisateur
+    // Diffuser uniquement dans la room de l'utilisateur
     socketService.broadcast('ventilateur.update', stateKey, payload);
 
     res.json({

@@ -2,6 +2,7 @@
 
 const jwt    = require('jsonwebtoken');
 const config = require('../config');
+const logger = require('../logger');
 
 /**
  * Vérifie un jeton navigateur émis par Laravel.
@@ -48,17 +49,17 @@ function socketAuth(socket, next) {
             socket.data.userId = verifyToken(token);
             return next();
         } catch (err) {
-            console.warn(`[WS] Jeton refusé (${socket.id}) : ${err.message}`);
+            logger.warn(`[WS] Jeton refusé (${socket.id}) : ${err.message}`);
             return next(new Error('unauthorized'));
         }
     }
 
     if (config.authRequired()) {
-        console.warn(`[WS] Connexion sans jeton refusée (${socket.id})`);
+        logger.warn(`[WS] Connexion sans jeton refusée (${socket.id})`);
         return next(new Error('unauthorized'));
     }
 
-    console.warn(`[WS] Connexion sans jeton acceptée (${socket.id}, WS_AUTH_REQUIRED=false)`);
+    logger.warnThrottled('legacy-socket', '[WS] Connexion sans jeton acceptée (WS_AUTH_REQUIRED=false)');
     return next();
 }
 

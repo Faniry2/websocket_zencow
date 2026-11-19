@@ -5,6 +5,7 @@ const router     = express.Router();
 
 const config                = require('../config');
 const { requireSecret }     = require('../middlewares/requireSecret');
+const { broadcastRateLimit } = require('../middlewares/rateLimit');
 const healthController      = require('../controllers/healthController');
 const ventilateurController = require('../controllers/ventilateurController');
 const brumisateurController = require('../controllers/brumisateurController');
@@ -23,7 +24,7 @@ router.get('/states', (req, res, next) => {
 }, healthController.states);
 
 // ─── Webhooks entrants depuis Laravel (en-tête X-WS-Secret) ───────────────────
-router.use('/broadcast', requireSecret);
+router.use('/broadcast', broadcastRateLimit, requireSecret);
 
 // Ventilateurs (vitesse + mode contrôleur)
 router.post('/broadcast/ventilateur', ventilateurController.broadcast);

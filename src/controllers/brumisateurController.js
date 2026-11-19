@@ -1,6 +1,7 @@
 'use strict';
 
-const socketService = require('../services/socketService');
+const socketService          = require('../services/socketService');
+const { validate, schemas }   = require('../validation');
 
 /**
  * POST /broadcast/brumisateur
@@ -22,37 +23,22 @@ const socketService = require('../services/socketService');
  *   "receivedAt":    "2026-04-22T13:19:51.545+00:00",
  *   "configId":      3
  * }
+ *
+ * devEui et refActionneur doivent être présents (null accepté, mais pas les
+ * deux). Tout champ non listé ci-dessus est refusé (422).
  */
-const DUREES = ['dureeOn', 'dureeOff', 'dureeTotale'];
-
 function broadcast(req, res) {
-    const payload = req.body || {};
+    const result = validate(schemas.brumisateur, req.body, 'brumisateur');
+    if (result.status) return res.status(result.status).json(result.body);
 
-    const required = ['event', 'userId', 'devEui', 'refActionneur', 'etat'];
-    const missing  = required.filter((k) => payload[k] === undefined || payload[k] === null);
-
-    if (missing.length > 0) {
-        return res.status(422).json({
-            error:   'Champs manquants dans le payload brumisateur.',
-            missing,
-        });
-    }
-
-    const dureesInvalides = DUREES.filter((k) => {
-        const v = payload[k];
-        if (v === undefined || v === null) return false;
-        return typeof v !== 'number' || !Number.isFinite(v) || v < 0;
-    });
-
-    if (dureesInvalides.length > 0) {
-        return res.status(422).json({
-            error:   'Les durées doivent être des nombres >= 0 ou null.',
-            invalid: dureesInvalides,
-        });
+    const payload = result.value;
+    const ref     = payload.refActionneur ?? payload.devEui;
+    if (ref === null || ref === undefined) {
+        return res.status(422).json({ error: 'refActionneur ou devEui doit être renseigné.' });
     }
 
     // Préfixe `user:` obligatoire : l'état est renvoyé à la connexion
-    const stateKey = `user:${payload.userId}:brumisateur:${payload.refActionneur}`;
+    const stateKey = `user:${payload.userId}:brumisateur:${ref}`;
 
     socketService.broadcast('brumisateur.update', stateKey, payload);
 
