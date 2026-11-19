@@ -47,10 +47,12 @@ socket.on('join', ({ userId }) => { socket.join(`user:${userId}`); ... })
 - Il suffit d'envoyer `join` avec `userId: 52` pour recevoir en direct les vitesses, ITH et alertes de l'éleveur 52, et le dernier état connu dès la connexion.
 
 À faire : un jeton signé par Laravel.
-- [ ] **[Laravel]** Générer un jeton court pour l'utilisateur connecté et l'injecter dans la page (`base.blade.php`, à côté de `window.wsUrl`) :
+- [x] **[Laravel]** Générer un jeton court pour l'utilisateur connecté et l'injecter dans la page (`base.blade.php`, à côté de `window.wsUrl`) :
+  - ✅ `App\Support\WebSocketToken` : JWT HS256 standard, payload `{"sub": <id entier>, "iat", "exp": iat + 3600}`, secret `config('webhook.ws_jwt_secret')` (env `WS_JWT_SECRET`). `window.wsToken` vaut `null` si l'utilisateur n'est pas connecté ou si le secret est absent.
   - JWT HS256 ou HMAC maison : `{ userId, exp: now + 1h }`, signé avec un secret partagé `WS_JWT_SECRET` ;
   - rendre le jeton disponible en JS : `window.wsToken`.
-- [ ] **[Laravel]** `fan.js` et `brumisateur.js` : envoyer le jeton à la connexion avec `io(wsUrl, { auth: { token: window.wsToken }, … })`, et **ne plus envoyer `userId`** dans `join`.
+- [x] **[Laravel]** `fan.js` et `brumisateur.js` : envoyer le jeton à la connexion avec `io(wsUrl, { auth: { token: window.wsToken }, … })`, et **ne plus envoyer `userId`** dans `join`.
+  - ✅ Côté Laravel : `auth.token` est envoyé. L'émission de `join` avec `userId` est **conservée** pour la rétrocompatibilité avec le serveur actuel en prod ; le nouveau serveur doit l'ignorer. À retirer une fois le serveur websocket déployé avec l'auth obligatoire.
 - [x] Websocket : un middleware `io.use((socket, next) => …)` vérifie la signature et l'expiration du jeton :
   - refuser la connexion si le jeton est invalide ;
   - sinon `socket.data.userId = payload.userId` et `socket.join('user:' + userId)` automatiquement.
@@ -70,8 +72,9 @@ Constat :
 
 À faire :
 - [x] Middleware Express `requireSecret` sur `/broadcast/*` : en-tête `X-WS-Secret` comparé à `process.env.WS_BROADCAST_SECRET` avec `crypto.timingSafeEqual`, sinon 401.
-- [ ] **[Laravel]** `mesureApiController` (ventilateur ligne ~786, brumisateur ligne ~881) : ajouter `->withHeaders(['X-WS-Secret' => config('webhook.ws_broadcast_secret')])`, avec la clé `ws_broadcast_secret` dans `config/webhook.php` (env `WS_BROADCAST_SECRET`).
-- [ ] **[Laravel]** Regrouper les appels au websocket dans un service unique `App\Services\WebSocketNotifier` au lieu de deux blocs recopiés dans le contrôleur.
+- [x] **[Laravel]** `mesureApiController` (ventilateur ligne ~786, brumisateur ligne ~881) : ajouter `->withHeaders(['X-WS-Secret' => config('webhook.ws_broadcast_secret')])`, avec la clé `ws_broadcast_secret` dans `config/webhook.php` (env `WS_BROADCAST_SECRET`).
+- [x] **[Laravel]** Regrouper les appels au websocket dans un service unique `App\Services\WebSocketNotifier` au lieu de deux blocs recopiés dans le contrôleur.
+  - ✅ `X-WS-Secret` envoyé seulement si `WS_BROADCAST_SECRET` est défini, timeout 3 s, aucune exception (warning journalisé aussi sur une réponse non 2xx, par exemple 401), payloads inchangés.
 - [x] `/states` : désactivé si `NODE_ENV=production`, ou protégé par le même secret.
 - [x] `/health` : garder le statut, mais retirer `clients` et `states`, ou les réserver aux requêtes avec le secret.
 - [ ] Côté proxy de prod, n'exposer que `/socket.io/` au public. `/broadcast/*` n'a besoin d'être joignable que par Laravel, en local sur le serveur.
