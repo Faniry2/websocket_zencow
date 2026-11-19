@@ -6,6 +6,7 @@ const socketService = require('../services/socketService');
  * POST /broadcast/alerte
  *
  * Reçoit depuis Laravel une alerte déclenchée (ITH critique, seuil dépassé…).
+ * (Non appelée par Laravel à ce jour, et aucun JS n'écoute `alerte.ith`.)
  *
  * Body attendu :
  * {
@@ -40,14 +41,15 @@ function broadcast(req, res) {
         });
     }
 
-    // ── Clé unique par user + capteur ──────────────────────────────────────
-    const stateKey = `alerte:${payload.userId}:${payload.capteurId ?? 'global'}`;
+    // ── Clé unique par user + capteur (préfixe `user:` : renvoyée à la connexion)
+    const stateKey = `user:${payload.userId}:alerte:${payload.capteurId ?? 'global'}`;
 
     // ── Diffuser via Socket.io ─────────────────────────────────────────────
     socketService.broadcast('alerte.ith', stateKey, payload);
 
     res.json({
         status:  'broadcasted',
+        room:    `user:${payload.userId}`,
         clients: socketService.clientsCount(),
         key:     stateKey,
     });

@@ -100,8 +100,8 @@ Constat (`capteurController.js`) :
 - `stateKey = capteur:${capteurId}` n'a pas le préfixe `user:` : même avec un `userId`, le dernier état ne serait jamais renvoyé à la connexion.
 - Laravel n'appelle pas cette route aujourd'hui, et aucun JS n'écoute `capteur.mesure`.
 
-- [ ] Décider : la supprimer, ou la corriger (`userId` obligatoire, `stateKey = user:${userId}:capteur:${capteurId}`).
-- [ ] Même vérification pour `/broadcast/alerte` : `alerte.ith` n'est écouté par aucun JS et n'est appelé nulle part par Laravel.
+- [x] Décider : la supprimer, ou la corriger (`userId` obligatoire, `stateKey = user:${userId}:capteur:${capteurId}`). *Décision : corrigée (pas supprimée), aucun appelant à ce jour.*
+- [x] Même vérification pour `/broadcast/alerte` : `alerte.ith` n'est écouté par aucun JS et n'est appelé nulle part par Laravel. *Corrigée aussi : `stateKey = user:${userId}:alerte:${capteurId ?? 'global'}`.*
 
 ---
 

@@ -6,10 +6,12 @@ const socketService = require('../services/socketService');
  * POST /broadcast/capteur
  *
  * Reçoit depuis Laravel les mesures THI d'un capteur.
+ * (Non appelée par Laravel à ce jour, et aucun JS n'écoute `capteur.mesure`.)
  *
  * Body attendu :
  * {
  *   "event":      "capteur.mesure",
+ *   "userId":     52,               <- obligatoire pour cibler la room
  *   "capteurId":  42,
  *   "devEui":     "abc123def456",
  *   "nom":        "Capteur Bâtiment A",
@@ -23,7 +25,7 @@ function broadcast(req, res) {
     const payload = req.body;
 
     // ── Validation ─────────────────────────────────────────────────────────
-    const required = ['event', 'capteurId', 'ith'];
+    const required = ['event', 'userId', 'capteurId', 'ith'];
     const missing  = required.filter((k) => payload[k] === undefined);
 
     if (missing.length > 0) {
@@ -33,14 +35,15 @@ function broadcast(req, res) {
         });
     }
 
-    // ── Clé unique par capteur ─────────────────────────────────────────────
-    const stateKey = `capteur:${payload.capteurId}`;
+    // ── Clé unique par user + capteur (préfixe `user:` : renvoyée à la connexion)
+    const stateKey = `user:${payload.userId}:capteur:${payload.capteurId}`;
 
     // ── Diffuser via Socket.io ─────────────────────────────────────────────
     socketService.broadcast('capteur.mesure', stateKey, payload);
 
     res.json({
         status:  'broadcasted',
+        room:    `user:${payload.userId}`,
         clients: socketService.clientsCount(),
         key:     stateKey,
     });
