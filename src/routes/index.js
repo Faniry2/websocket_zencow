@@ -5,6 +5,7 @@ const router     = express.Router();
 
 const healthController     = require('../controllers/healthController');
 const ventilateurController = require('../controllers/ventilateurController');
+const brumisateurController = require('../controllers/brumisateurController');
 const capteurController    = require('../controllers/capteurController');
 const alerteController     = require('../controllers/alerteController');
 
@@ -16,6 +17,9 @@ router.get('/states', healthController.states);
 
 // Ventilateurs (vitesse + mode contrôleur)
 router.post('/broadcast/ventilateur', ventilateurController.broadcast);
+
+// Brumisateurs (état marche/arrêt + durées de cycle)
+router.post('/broadcast/brumisateur', brumisateurController.broadcast);
 
 // Capteurs THI (température, humidité, ITH)
 router.post('/broadcast/capteur', capteurController.broadcast);
