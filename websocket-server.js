@@ -10,7 +10,7 @@ app.server.listen(PORT, HOST, () => {
     console.log('══════════════════════════════════════════');
     console.log('  ZenCow WebSocket Server');
     console.log(`  Écoute    : http://${HOST}:${PORT}`);
-    console.log(`  CORS      : ${process.env.ALLOWED_ORIGIN}`);
+    console.log(`  Origines  : ${process.env.ALLOWED_ORIGIN || '(non défini : origine non vérifiée en websocket)'}`);
     console.log(`  Env       : ${process.env.NODE_ENV || 'development'}`);
     console.log('══════════════════════════════════════════');
 });

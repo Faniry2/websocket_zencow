@@ -86,10 +86,10 @@ Constat :
 - En prod, `ALLOWED_ORIGIN=https://testapi.zencow.fr` est l'adresse du serveur websocket lui-même, pas celle du site. Ça marche quand même, uniquement parce que le websocket ignore ce réglage.
 
 À faire :
-- [ ] `socketService.init` : ajouter `allowRequest: (req, cb) => cb(null, origines.includes(req.headers.origin))` pour vérifier l'origine aussi en websocket.
-- [ ] Accepter plusieurs origines : `ALLOWED_ORIGIN=https://zencow.fr,https://www.zencow.fr`, découpées sur `,` dans `src/app.js`.
+- [x] `socketService.init` : ajouter `allowRequest: (req, cb) => cb(null, origines.includes(req.headers.origin))` pour vérifier l'origine aussi en websocket.
+- [x] Accepter plusieurs origines : `ALLOWED_ORIGIN=https://zencow.fr,https://www.zencow.fr`, découpées sur `,` dans `src/app.js`.
 - [ ] **Prod** : corriger `ALLOWED_ORIGIN` dans le `.env` du serveur avec le vrai domaine du site, **avant** de déployer le point précédent, sinon toutes les connexions seront refusées.
-- [ ] Local : `docker-compose.yml` fournit déjà `ALLOWED_ORIGIN=https://zencow.test`.
+- [x] Local : `docker-compose.yml` fournit déjà `ALLOWED_ORIGIN=https://zencow.test`.
 
 ---
 

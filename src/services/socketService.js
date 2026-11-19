@@ -1,6 +1,7 @@
 'use strict';
 
 const { Server } = require('socket.io');
+const config     = require('../config');
 
 /**
  * socketService
@@ -21,13 +22,29 @@ let io = null;
 // Structure : { 'user:52:ventilateur:98f2127d': payload }
 const latestStates = new Map();
 
-function init(server, allowedOrigin) {
+/**
+ * Vérifie l'origine de chaque poignée de main, y compris en transport
+ * websocket (l'option `cors` ne s'applique qu'au polling).
+ * Appliqué uniquement si ALLOWED_ORIGIN est défini.
+ */
+function allowRequest(req, cb) {
+    const origins = config.allowedOrigins();
+    if (origins.length === 0) return cb(null, true);
+
+    const origin = req.headers.origin;
+    const ok = origins.includes(origin);
+    if (!ok) console.warn(`[WS] Origine refusée : ${origin || '(absente)'}`);
+    cb(null, ok);
+}
+
+function init(server, corsOrigin) {
     io = new Server(server, {
         cors: {
-            origin:  allowedOrigin,
+            origin:  corsOrigin,
             methods: ['GET', 'POST'],
         },
         transports: ['websocket', 'polling'],
+        allowRequest,
     });
 
     io.on('connection', (socket) => {

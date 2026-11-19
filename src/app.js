@@ -5,19 +5,23 @@ const http         = require('http');
 const cors         = require('cors');
 const socketService = require('./services/socketService');
 const routes       = require('./routes/index');
+const config       = require('./config');
 
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:8000';
+// Origine CORS vérifiée à chaque requête (ALLOWED_ORIGIN peut en lister plusieurs)
+function corsOrigin(origin, cb) {
+    cb(null, !origin || config.corsOrigins().includes(origin));
+}
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
 
 // ─── Middlewares ──────────────────────────────────────────────────────────────
-app.use(cors({ origin: ALLOWED_ORIGIN }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
-socketService.init(server, ALLOWED_ORIGIN);
+socketService.init(server, corsOrigin);
 
 // ─── Routes HTTP ──────────────────────────────────────────────────────────────
 app.use('/', routes);
