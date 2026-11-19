@@ -5,7 +5,8 @@
   "main": "websocket-server.js",
   "scripts": {
     "start": "node websocket-server.js",
-    "dev": "node --watch websocket-server.js"
+    "dev": "node --watch websocket-server.js",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
   },
   "dependencies": {
     "cors": "^2.8.5",

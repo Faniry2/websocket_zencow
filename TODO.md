@@ -126,12 +126,12 @@ Constat (`capteurController.js`) :
 
 ## 8. 🟢 Tests
 
-- [ ] Ajouter `vitest` ou `jest` + `supertest` + `socket.io-client` en dépendances de développement.
-- [ ] `POST /broadcast/brumisateur` : 422 si un champ manque, 401 sans secret, 200 sinon, et le message arrive dans la bonne room.
-- [ ] Connexion socket.io : refusée sans jeton, avec un jeton expiré ou falsifié, ou depuis une origine non autorisée.
-- [ ] Un client de l'utilisateur A ne reçoit **jamais** les messages de l'utilisateur B.
-- [ ] Le dernier état est renvoyé à la connexion, pour le ventilateur et le brumisateur.
-- [ ] Script `npm test` dans `package.json`.
+- [x] Ajouter `vitest` ou `jest` + `supertest` + `socket.io-client` en dépendances de développement. *Fait avec le lanceur intégré `node:test` (pas de vitest/jest : aucune dépendance de plus) + `supertest` + `socket.io-client`.*
+- [x] `POST /broadcast/brumisateur` : 422 si un champ manque, 401 sans secret, 200 sinon, et le message arrive dans la bonne room.
+- [x] Connexion socket.io : refusée sans jeton, avec un jeton expiré ou falsifié, ou depuis une origine non autorisée.
+- [x] Un client de l'utilisateur A ne reçoit **jamais** les messages de l'utilisateur B.
+- [x] Le dernier état est renvoyé à la connexion, pour le ventilateur et le brumisateur.
+- [x] Script `npm test` dans `package.json`.
 
 ---
 
