@@ -69,11 +69,11 @@ Constat :
 - En prod, ces routes sont publiques si le proxy de `testapi.zencow.fr` transmet tout au serveur Node. À vérifier : `curl https://testapi.zencow.fr/states`.
 
 À faire :
-- [ ] Middleware Express `requireSecret` sur `/broadcast/*` : en-tête `X-WS-Secret` comparé à `process.env.WS_BROADCAST_SECRET` avec `crypto.timingSafeEqual`, sinon 401.
+- [x] Middleware Express `requireSecret` sur `/broadcast/*` : en-tête `X-WS-Secret` comparé à `process.env.WS_BROADCAST_SECRET` avec `crypto.timingSafeEqual`, sinon 401.
 - [ ] **[Laravel]** `mesureApiController` (ventilateur ligne ~786, brumisateur ligne ~881) : ajouter `->withHeaders(['X-WS-Secret' => config('webhook.ws_broadcast_secret')])`, avec la clé `ws_broadcast_secret` dans `config/webhook.php` (env `WS_BROADCAST_SECRET`).
 - [ ] **[Laravel]** Regrouper les appels au websocket dans un service unique `App\Services\WebSocketNotifier` au lieu de deux blocs recopiés dans le contrôleur.
-- [ ] `/states` : désactivé si `NODE_ENV=production`, ou protégé par le même secret.
-- [ ] `/health` : garder le statut, mais retirer `clients` et `states`, ou les réserver aux requêtes avec le secret.
+- [x] `/states` : désactivé si `NODE_ENV=production`, ou protégé par le même secret.
+- [x] `/health` : garder le statut, mais retirer `clients` et `states`, ou les réserver aux requêtes avec le secret.
 - [ ] Côté proxy de prod, n'exposer que `/socket.io/` au public. `/broadcast/*` n'a besoin d'être joignable que par Laravel, en local sur le serveur.
 
 ---
