@@ -1,15 +1,18 @@
 'use strict';
 
-const socketService = require('../services/socketService');
+const socketService          = require('../services/socketService');
+const { validate, schemas }   = require('../validation');
 
 /**
  * POST /broadcast/capteur
  *
  * Reçoit depuis Laravel les mesures THI d'un capteur.
+ * (Non appelée par Laravel à ce jour, et aucun JS n'écoute `capteur.mesure`.)
  *
  * Body attendu :
  * {
  *   "event":      "capteur.mesure",
+ *   "userId":     52,               <- obligatoire pour cibler la room
  *   "capteurId":  42,
  *   "devEui":     "abc123def456",
  *   "nom":        "Capteur Bâtiment A",
@@ -20,27 +23,19 @@ const socketService = require('../services/socketService');
  * }
  */
 function broadcast(req, res) {
-    const payload = req.body;
+    const result = validate(schemas.capteur, req.body, 'capteur');
+    if (result.status) return res.status(result.status).json(result.body);
 
-    // ── Validation ─────────────────────────────────────────────────────────
-    const required = ['event', 'capteurId', 'ith'];
-    const missing  = required.filter((k) => payload[k] === undefined);
+    const payload = result.value;
 
-    if (missing.length > 0) {
-        return res.status(422).json({
-            error:   'Champs manquants dans le payload capteur.',
-            missing,
-        });
-    }
+    // ── Clé unique par user + capteur (préfixe `user:` : renvoyée à la connexion)
+    const stateKey = `user:${payload.userId}:capteur:${payload.capteurId}`;
 
-    // ── Clé unique par capteur ─────────────────────────────────────────────
-    const stateKey = `capteur:${payload.capteurId}`;
-
-    // ── Diffuser via Socket.io ─────────────────────────────────────────────
     socketService.broadcast('capteur.mesure', stateKey, payload);
 
     res.json({
         status:  'broadcasted',
+        room:    `user:${payload.userId}`,
         clients: socketService.clientsCount(),
         key:     stateKey,
     });

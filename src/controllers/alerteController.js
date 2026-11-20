@@ -1,11 +1,13 @@
 'use strict';
 
-const socketService = require('../services/socketService');
+const socketService          = require('../services/socketService');
+const { validate, schemas }   = require('../validation');
 
 /**
  * POST /broadcast/alerte
  *
  * Reçoit depuis Laravel une alerte déclenchée (ITH critique, seuil dépassé…).
+ * (Non appelée par Laravel à ce jour, et aucun JS n'écoute `alerte.ith`.)
  *
  * Body attendu :
  * {
@@ -20,34 +22,19 @@ const socketService = require('../services/socketService');
  * }
  */
 function broadcast(req, res) {
-    const payload = req.body;
+    const result = validate(schemas.alerte, req.body, 'alerte');
+    if (result.status) return res.status(result.status).json(result.body);
 
-    // ── Validation ─────────────────────────────────────────────────────────
-    const required = ['event', 'userId', 'ith', 'niveau'];
-    const missing  = required.filter((k) => payload[k] === undefined);
+    const payload = result.value;
 
-    if (missing.length > 0) {
-        return res.status(422).json({
-            error:   'Champs manquants dans le payload alerte.',
-            missing,
-        });
-    }
+    // ── Clé unique par user + capteur (préfixe `user:` : renvoyée à la connexion)
+    const stateKey = `user:${payload.userId}:alerte:${payload.capteurId ?? 'global'}`;
 
-    const niveauxValides = ['attention', 'alerte', 'critique'];
-    if (!niveauxValides.includes(payload.niveau)) {
-        return res.status(422).json({
-            error: `niveau doit être : ${niveauxValides.join(', ')}.`,
-        });
-    }
-
-    // ── Clé unique par user + capteur ──────────────────────────────────────
-    const stateKey = `alerte:${payload.userId}:${payload.capteurId ?? 'global'}`;
-
-    // ── Diffuser via Socket.io ─────────────────────────────────────────────
     socketService.broadcast('alerte.ith', stateKey, payload);
 
     res.json({
         status:  'broadcasted',
+        room:    `user:${payload.userId}`,
         clients: socketService.clientsCount(),
         key:     stateKey,
     });
